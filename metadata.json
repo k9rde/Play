@@ -1,0 +1,6 @@
+{
+  "name": "مكعبات الطيف",
+  "description": "لعبة ألغاز المكعبات المتساقطة بأسلوب تتريس مع ميزة التدرج اللوني المستمر للقطع",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
