@@ -218,6 +218,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(showSettings = false) }
     }
 
+    fun returnToHome() {
+        gravityJob?.cancel()
+        lockDelayJob?.cancel()
+        preparePreviewQueue()
+        _uiState.update {
+            it.copy(
+                board = emptyBoard(),
+                activePiece = null,
+                ghostY = null,
+                holdPiece = null,
+                clearingRows = emptySet(),
+                clearBanner = null,
+                status = GameStatus.READY,
+                showSettings = false
+            )
+        }
+    }
+
+    fun updateVisualTheme(theme: AppVisualTheme) {
+        viewModelScope.launch { repository.setVisualTheme(theme) }
+    }
+
     fun moveLeft() = tryMove(dx = -1, dy = 0, userTriggered = true)
 
     fun moveRight() = tryMove(dx = 1, dy = 0, userTriggered = true)

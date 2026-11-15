@@ -33,22 +33,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.StoredGameStatsAndSettings
+import com.example.game.AppVisualTheme
 import com.example.game.ColorShiftMode
 import com.example.game.ColorShiftSpeed
-import com.example.ui.theme.ObsidianBorder
-import com.example.ui.theme.ObsidianBorderSubtle
-import com.example.ui.theme.ObsidianSurface
-import com.example.ui.theme.ObsidianSurfaceElevated
-import com.example.ui.theme.PrismCyan
-import com.example.ui.theme.PrismMagenta
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.ui.theme.LocalGamePalette
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsSheet(
     settings: StoredGameStatsAndSettings,
     onDismiss: () -> Unit,
+    onSelectVisualTheme: (AppVisualTheme) -> Unit,
     onSelectColorMode: (ColorShiftMode) -> Unit,
     onSelectColorSpeed: (ColorShiftSpeed) -> Unit,
     onToggleGhost: (Boolean) -> Unit,
@@ -56,13 +51,14 @@ fun SettingsSheet(
     onToggleSound: (Boolean) -> Unit,
     onToggleHaptics: (Boolean) -> Unit
 ) {
+    val palette = LocalGamePalette.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = ObsidianSurface,
-        contentColor = TextPrimary
+        containerColor = palette.surface,
+        contentColor = palette.textPrimary
     ) {
         Column(
             modifier = Modifier
@@ -76,15 +72,47 @@ fun SettingsSheet(
             Text(
                 text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.titleLarge,
-                color = TextPrimary
+                color = palette.textPrimary
             )
+
+            // Visual Theme Selector
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = stringResource(R.string.visual_theme_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = palette.accentPrimary
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ThemeChip(
+                        label = stringResource(R.string.theme_ceramic),
+                        selected = settings.visualTheme == AppVisualTheme.DAYLIGHT_CERAMIC,
+                        onClick = { onSelectVisualTheme(AppVisualTheme.DAYLIGHT_CERAMIC) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    ThemeChip(
+                        label = stringResource(R.string.theme_midnight),
+                        selected = settings.visualTheme == AppVisualTheme.MIDNIGHT_GLASS,
+                        onClick = { onSelectVisualTheme(AppVisualTheme.MIDNIGHT_GLASS) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    ThemeChip(
+                        label = stringResource(R.string.theme_retro),
+                        selected = settings.visualTheme == AppVisualTheme.RETRO_SYNTH,
+                        onClick = { onSelectVisualTheme(AppVisualTheme.RETRO_SYNTH) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
 
             // Color Shift Mode Selector
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = stringResource(R.string.color_mode_title),
                     style = MaterialTheme.typography.titleMedium,
-                    color = PrismCyan
+                    color = palette.accentSecondary
                 )
                 ColorModeOption(
                     title = stringResource(R.string.mode_continuous),
@@ -114,7 +142,7 @@ fun SettingsSheet(
                 Text(
                     text = stringResource(R.string.color_speed_title),
                     style = MaterialTheme.typography.titleMedium,
-                    color = PrismMagenta
+                    color = palette.accentTertiary
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -146,8 +174,8 @@ fun SettingsSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(16.dp))
-                    .background(ObsidianSurfaceElevated)
-                    .border(1.dp, ObsidianBorderSubtle, RoundedCornerShape(16.dp))
+                    .background(palette.bgTop.copy(alpha = 0.5f))
+                    .border(1.dp, palette.borderSubtle, RoundedCornerShape(16.dp))
                     .padding(horizontal = 14.dp, vertical = 6.dp)
             ) {
                 SettingToggleRow(
@@ -178,6 +206,36 @@ fun SettingsSheet(
 }
 
 @Composable
+private fun ThemeChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalGamePalette.current
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = {
+            Text(text = label, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = palette.accentPrimary.copy(alpha = 0.18f),
+            selectedLabelColor = palette.accentPrimary,
+            containerColor = palette.bgTop.copy(alpha = 0.55f),
+            labelColor = palette.textSecondary
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = selected,
+            borderColor = palette.borderSubtle,
+            selectedBorderColor = palette.accentPrimary
+        ),
+        modifier = modifier
+    )
+}
+
+@Composable
 private fun ColorModeOption(
     title: String,
     description: String,
@@ -185,14 +243,15 @@ private fun ColorModeOption(
     onClick: () -> Unit,
     testTagName: String
 ) {
+    val palette = LocalGamePalette.current
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
-            .background(if (selected) ObsidianSurfaceElevated else ObsidianSurface)
+            .background(if (selected) palette.accentSecondary.copy(alpha = 0.10f) else palette.bgTop.copy(alpha = 0.45f))
             .border(
                 width = if (selected) 1.5.dp else 1.dp,
-                color = if (selected) PrismCyan else ObsidianBorder,
+                color = if (selected) palette.accentSecondary else palette.borderSubtle,
                 shape = RoundedCornerShape(14.dp)
             )
             .clickable(onClick = onClick)
@@ -202,13 +261,13 @@ private fun ColorModeOption(
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
-            color = if (selected) PrismCyan else TextPrimary,
+            color = if (selected) palette.accentSecondary else palette.textPrimary,
             fontWeight = FontWeight.Bold
         )
         Text(
             text = description,
             style = MaterialTheme.typography.bodyMedium,
-            color = TextSecondary
+            color = palette.textSecondary
         )
     }
 }
@@ -220,26 +279,24 @@ private fun SpeedChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val palette = LocalGamePalette.current
     FilterChip(
         selected = selected,
         onClick = onClick,
         label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge
-            )
+            Text(text = label, style = MaterialTheme.typography.labelLarge)
         },
         colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = PrismMagenta.copy(alpha = 0.22f),
-            selectedLabelColor = PrismMagenta,
-            containerColor = ObsidianSurfaceElevated,
-            labelColor = TextSecondary
+            selectedContainerColor = palette.accentTertiary.copy(alpha = 0.20f),
+            selectedLabelColor = palette.accentTertiary,
+            containerColor = palette.bgTop.copy(alpha = 0.55f),
+            labelColor = palette.textSecondary
         ),
         border = FilterChipDefaults.filterChipBorder(
             enabled = true,
             selected = selected,
-            borderColor = ObsidianBorder,
-            selectedBorderColor = PrismMagenta
+            borderColor = palette.borderSubtle,
+            selectedBorderColor = palette.accentTertiary
         ),
         modifier = modifier
     )
@@ -251,6 +308,7 @@ private fun SettingToggleRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val palette = LocalGamePalette.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -261,7 +319,7 @@ private fun SettingToggleRow(
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            color = TextPrimary,
+            color = palette.textPrimary,
             modifier = Modifier
                 .weight(1f)
                 .padding(end = 12.dp)
@@ -270,10 +328,10 @@ private fun SettingToggleRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = TextPrimary,
-                checkedTrackColor = PrismCyan,
-                uncheckedThumbColor = TextSecondary,
-                uncheckedTrackColor = ObsidianSurface
+                checkedThumbColor = palette.surface,
+                checkedTrackColor = palette.accentPrimary,
+                uncheckedThumbColor = palette.textSecondary,
+                uncheckedTrackColor = palette.borderSubtle
             )
         )
     }

@@ -1,21 +1,18 @@
 package com.example.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -50,37 +47,55 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.game.ColorShiftMode
 import com.example.game.GameStatus
+import com.example.game.GameUiState
 import com.example.game.GameViewModel
 import com.example.game.HapticCue
 import com.example.ui.components.ArcadeControls
 import com.example.ui.components.BoardCanvas
+import com.example.ui.components.CompactGameHudStrip
 import com.example.ui.components.GameStatusOverlay
+import com.example.ui.components.HomeLobby
 import com.example.ui.components.LiveSpectrumBar
-import com.example.ui.components.ScoreHeaderRow
 import com.example.ui.components.SettingsSheet
-import com.example.ui.components.SideHudColumn
-import com.example.ui.theme.ObsidianBg
-import com.example.ui.theme.ObsidianBgSecondary
-import com.example.ui.theme.ObsidianSurfaceElevated
-import com.example.ui.theme.PrismCyan
-import com.example.ui.theme.PrismMagenta
-import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.LocalGamePalette
+import com.example.ui.theme.SpectrumBlocksTheme
 
 @Composable
-fun SpectrumBlocksScreen(
+fun SpectrumBlocksApp(
     viewModel: GameViewModel,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    SpectrumBlocksTheme(visualTheme = uiState.statsAndSettings.visualTheme) {
+        SpectrumBlocksScreen(
+            uiState = uiState,
+            viewModel = viewModel,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun SpectrumBlocksScreen(
+    uiState: GameUiState,
+    viewModel: GameViewModel,
+    modifier: Modifier = Modifier
+) {
+    val palette = LocalGamePalette.current
     val hapticFeedback = LocalHapticFeedback.current
     var colorPhase by remember { mutableFloatStateOf(0f) }
 
-    // Drive smooth 60fps gradual color shifting without triggering Compose tree recompositions
+    // Pause active game on system Back press instead of immediately exiting
+    BackHandler(enabled = uiState.status == GameStatus.PLAYING) {
+        viewModel.pauseGame()
+    }
+
     LaunchedEffect(uiState.status, uiState.statsAndSettings.colorShiftSpeed) {
         val baseRate = uiState.statsAndSettings.colorShiftSpeed.degreesPerSecond
         val speedDegPerSec = when (uiState.status) {
             GameStatus.PLAYING -> baseRate
-            GameStatus.READY -> baseRate * 0.65f
+            GameStatus.READY -> baseRate * 0.70f
             GameStatus.PAUSED, GameStatus.GAME_OVER -> 0f
         }
         if (speedDegPerSec > 0f) {
@@ -119,23 +134,28 @@ fun SpectrumBlocksScreen(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(ObsidianBgSecondary, ObsidianBg, ObsidianBg)
+                    colors = listOf(palette.bgTop, palette.bgBottom)
                 )
             )
             .windowInsetsPadding(WindowInsets.safeDrawing)
     ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            val isWideLayout = maxWidth >= 600.dp
-
+        if (uiState.status == GameStatus.READY) {
+            HomeLobby(
+                uiState = uiState,
+                colorPhaseProvider = { colorPhase },
+                onStartGame = viewModel::startNewGame,
+                onSelectVisualTheme = viewModel::updateVisualTheme,
+                onSelectColorMode = viewModel::updateColorShiftMode,
+                onStartingLevelChange = viewModel::setStartingLevel,
+                onOpenSettings = viewModel::openSettings
+            )
+        } else {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .widthIn(max = 760.dp)
-                    .align(Alignment.Center),
+                    .widthIn(max = 540.dp)
+                    .align(Alignment.Center)
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 TopArcadeHeader(
@@ -149,53 +169,35 @@ fun SpectrumBlocksScreen(
                     onTogglePause = viewModel::togglePause
                 )
 
-                ScoreHeaderRow(
-                    score = uiState.score,
-                    highScore = uiState.highScore
+                CompactGameHudStrip(
+                    uiState = uiState,
+                    colorPhaseProvider = { colorPhase },
+                    onHoldClick = viewModel::holdCurrentPiece,
+                    onCycleColorMode = cycleColorMode
                 )
 
-                // Center Playfield + Side HUD
+                // Hero centered 10x20 Playfield with generous proportions
                 Box(
+                    contentAlignment = Alignment.Center,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .padding(vertical = 2.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxSize(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            contentAlignment = Alignment.Center,
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                        ) {
-                            BoardCanvas(
-                                uiState = uiState,
-                                colorPhaseProvider = { colorPhase },
-                                gesturesEnabled = uiState.statsAndSettings.gesturesEnabled,
-                                ghostEnabled = uiState.statsAndSettings.ghostEnabled,
-                                onTapRotate = viewModel::rotateClockwise,
-                                onMoveLeft = viewModel::moveLeft,
-                                onMoveRight = viewModel::moveRight,
-                                onSoftDrop = viewModel::softDrop,
-                                onHardDrop = viewModel::hardDrop,
-                                modifier = Modifier.fillMaxHeight()
-                            )
-                        }
-
-                        SideHudColumn(
-                            uiState = uiState,
-                            colorPhaseProvider = { colorPhase },
-                            onHoldClick = viewModel::holdCurrentPiece,
-                            onCycleColorMode = cycleColorMode,
-                            modifier = Modifier.width(if (isWideLayout) 136.dp else 100.dp)
-                        )
-                    }
+                    BoardCanvas(
+                        uiState = uiState,
+                        colorPhaseProvider = { colorPhase },
+                        gesturesEnabled = uiState.statsAndSettings.gesturesEnabled,
+                        ghostEnabled = uiState.statsAndSettings.ghostEnabled,
+                        onTapRotate = viewModel::rotateClockwise,
+                        onMoveLeft = viewModel::moveLeft,
+                        onMoveRight = viewModel::moveRight,
+                        onSoftDrop = viewModel::softDrop,
+                        onHardDrop = viewModel::hardDrop,
+                        modifier = Modifier.fillMaxHeight()
+                    )
                 }
 
-                // Bottom Tactile Controls
                 ArcadeControls(
                     enabled = uiState.status == GameStatus.PLAYING,
                     onMoveLeft = viewModel::moveLeft,
@@ -204,26 +206,25 @@ fun SpectrumBlocksScreen(
                     onHardDrop = viewModel::hardDrop,
                     onRotateCw = viewModel::rotateClockwise,
                     onRotateCcw = viewModel::rotateCounterClockwise,
-                    modifier = Modifier.padding(top = 2.dp, bottom = 4.dp)
+                    modifier = Modifier.padding(bottom = 2.dp)
                 )
             }
+
+            GameStatusOverlay(
+                uiState = uiState,
+                colorPhaseProvider = { colorPhase },
+                onStartGame = viewModel::startNewGame,
+                onResumeGame = viewModel::resumeGame,
+                onOpenSettings = viewModel::openSettings,
+                onReturnHome = viewModel::returnToHome
+            )
         }
 
-        // Ready / Paused / Game Over Modal Overlay
-        GameStatusOverlay(
-            uiState = uiState,
-            colorPhaseProvider = { colorPhase },
-            onStartGame = viewModel::startNewGame,
-            onResumeGame = viewModel::resumeGame,
-            onOpenSettings = viewModel::openSettings,
-            onStartingLevelChange = viewModel::setStartingLevel
-        )
-
-        // Color & Control Settings Sheet
         if (uiState.showSettings) {
             SettingsSheet(
                 settings = uiState.statsAndSettings,
                 onDismiss = viewModel::closeSettings,
+                onSelectVisualTheme = viewModel::updateVisualTheme,
                 onSelectColorMode = viewModel::updateColorShiftMode,
                 onSelectColorSpeed = viewModel::updateColorShiftSpeed,
                 onToggleGhost = viewModel::setGhostEnabled,
@@ -246,6 +247,8 @@ private fun TopArcadeHeader(
     onOpenSettings: () -> Unit,
     onTogglePause: () -> Unit
 ) {
+    val palette = LocalGamePalette.current
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -260,16 +263,14 @@ private fun TopArcadeHeader(
                 mode = mode,
                 level = level,
                 modifier = Modifier
-                    .size(width = 22.dp, height = 22.dp)
+                    .size(20.dp)
                     .clip(CircleShape)
             )
-            Column {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = TextPrimary
-                )
-            }
+            Text(
+                text = stringResource(R.string.app_name),
+                style = MaterialTheme.typography.titleLarge,
+                color = palette.textPrimary
+            )
         }
 
         Row(
@@ -279,8 +280,8 @@ private fun TopArcadeHeader(
             IconButton(
                 onClick = onToggleSound,
                 colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = ObsidianSurfaceElevated,
-                    contentColor = if (soundEnabled) PrismCyan else TextPrimary.copy(alpha = 0.5f)
+                    containerColor = palette.surface,
+                    contentColor = if (soundEnabled) palette.accentPrimary else palette.textSecondary
                 ),
                 modifier = Modifier
                     .size(48.dp)
@@ -301,8 +302,8 @@ private fun TopArcadeHeader(
             IconButton(
                 onClick = onOpenSettings,
                 colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = ObsidianSurfaceElevated,
-                    contentColor = PrismMagenta
+                    containerColor = palette.surface,
+                    contentColor = palette.accentSecondary
                 ),
                 modifier = Modifier
                     .size(48.dp)
@@ -314,28 +315,26 @@ private fun TopArcadeHeader(
                 )
             }
 
-            if (status == GameStatus.PLAYING || status == GameStatus.PAUSED) {
-                IconButton(
-                    onClick = onTogglePause,
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = ObsidianSurfaceElevated,
-                        contentColor = TextPrimary
-                    ),
-                    modifier = Modifier
-                        .size(48.dp)
-                        .testTag("pause_toggle_button")
-                ) {
-                    Icon(
-                        imageVector = if (status == GameStatus.PLAYING) {
-                            Icons.Rounded.Pause
-                        } else {
-                            Icons.Rounded.PlayArrow
-                        },
-                        contentDescription = stringResource(
-                            if (status == GameStatus.PLAYING) R.string.cd_pause else R.string.cd_resume
-                        )
+            IconButton(
+                onClick = onTogglePause,
+                colors = IconButtonDefaults.iconButtonColors(
+                    containerColor = palette.surface,
+                    contentColor = palette.textPrimary
+                ),
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("pause_toggle_button")
+            ) {
+                Icon(
+                    imageVector = if (status == GameStatus.PLAYING) {
+                        Icons.Rounded.Pause
+                    } else {
+                        Icons.Rounded.PlayArrow
+                    },
+                    contentDescription = stringResource(
+                        if (status == GameStatus.PLAYING) R.string.cd_pause else R.string.cd_resume
                     )
-                }
+                )
             }
         }
     }

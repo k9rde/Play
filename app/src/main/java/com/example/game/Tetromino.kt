@@ -127,3 +127,9 @@ enum class ColorShiftSpeed(val degreesPerSecond: Float) {
     MEDIUM(44f),
     FAST(92f)
 }
+
+enum class AppVisualTheme {
+    MIDNIGHT_GLASS,
+    DAYLIGHT_CERAMIC,
+    RETRO_SYNTH
+}
